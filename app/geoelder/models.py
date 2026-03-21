@@ -1,0 +1,30 @@
+from django.db import models
+from django.contrib.auth.models import User 
+
+class Lar(models.Model):
+    nome = models.CharField(max_length=100)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+class Velhinho(models.Model):
+    sexo_opcoes = [
+    ('F', 'Feminino'),
+    ('M', 'Masculino')
+]
+    nome = models.CharField(max_length=100)
+    lar = models.ForeignKey(Lar, on_delete=models.CASCADE)
+    idade = models.IntegerField()
+    sexo = models.CharField(max_length=1, choices=sexo_opcoes)
+    doencas = models.CharField(max_length=300)
+    daily_step_goal = models.IntegerField(default=2000)
+
+    center_lat =models.FloatField()
+    center_lng =models.FloatField()
+    radius =models.IntegerField(default=500)
+# Create your models here.
+
+class Localizacao(models.Model):
+    velhinho= models.ForeignKey(Velhinho, on_delete=models.CASCADE)
+    latitude=models.FloatField()
+    longitude=models.FloatField()
+    passos=models.IntegerField(default=0)
+    timestamp=models.DateTimeField(auto_now=True)
