@@ -1,41 +1,145 @@
-<div id="map" style="height:600px;"></div>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitorização GeoElder - Campus Gualtar</title>
 
-<script>
-var map = L.map('map').setView([41.55, -8.42], 13);
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
 
-var markers = {};
+        #map { 
+            height: 650px; 
+            width: 100%; 
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border: 2px solid #fff;
+        }
 
-function atualizar() {
-    fetch('/api/localizacoes/')
-    .then(res => res.json())
-    .then(data => {
+        .btn-add {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: transform 0.2s, background 0.2s;
+        }
 
-        data.forEach(i => {
+        .btn-add:hover {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
 
-            if (markers[i.id]) {
-                map.removeLayer(markers[i.id]);
-            }
+        .btn-logout {
+            color: #dc3545;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-left: 15px;
+        }
+    </style>
+</head>
+<body>
 
-            var cor = i.dentro ? "green" : "red";
+    <div class="header-container">
+        <div>
+            <h1 style="margin:0; color: #333;">{{ request.user.lar.nome }}</h1>
+            <small>📍 Monitorização Campus UMinho</small>
+        </div>
+        <div>
+            <a href="{% url 'novovelhinho' %}" class="btn-add">+ Adicionar Velhinho</a>
+            <a href="/logout/" class="btn-logout">Sair</a>
+        </div>
+    </div>
 
-            var marker = L.circleMarker([i.lat, i.lng], {
-                color: cor,
-                radius: 8
-            }).addTo(map);
+    <div id="map"></div>
 
-            marker.bindPopup(`
-                <b>${i.nome}</b><br>
-                Passos: ${i.passos}<br>
-                Distância: ${i.distancia}m
-            `);
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-            markers[i.id] = marker;
-        });
-    });
-}
+    <script>
+        // Pegar coordenadas dinâmicas do Lar (Default: UMinho Gualtar)
+        var larLat = {{ request.user.lar.center_lat|default:41.5607|stringformat:".4f" }};
+        var larLng = {{ request.user.lar.center_lng|default:-8.3972|stringformat:".4f" }};
+        var raioSeguranca = {{ request.user.lar.radius|default:500 }};
 
-setInterval(atualizar, 5000);
-atualizar();
-</script>
+        // Inicializar o mapa focado no Lar
+        var map = L.map('map').setView([larLat, larLng], 16);
+
+        // Camada do OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Desenhar a área segura (Círculo Azul)
+        L.circle([larLat, larLng], {
+            color: '#3388ff',
+            fillColor: '#3388ff',
+            fillOpacity: 0.15,
+            radius: raioSeguranca
+        }).addTo(map).bindPopup("Área Segura do Lar");
+
+        // Ícone da "Casa" para o Lar
+        L.marker([larLat, larLng]).addTo(map)
+            .bindPopup("<b>Sede do Lar:</b><br>{{ request.user.lar.nome }}")
+            .openPopup();
+
+        var markers = {};
+
+        function atualizar() {
+            fetch('/api/localizacoes/')
+            .then(res => res.json())
+            .then(data => {
+                console.log("Atualizando idosos...", data);
+                data.forEach(i => {
+                    // Remover se já existir para atualizar posição
+                    if (markers[i.id]) {
+                        map.removeLayer(markers[i.id]);
+                    }
+
+                    // Verde se estiver dentro, Vermelho se estiver fora
+                    var cor = i.dentro ? "#28a745" : "#dc3545";
+
+                    var marker = L.circleMarker([i.lat, i.lng], {
+                        color: cor,
+                        fillColor: cor,
+                        fillOpacity: 0.8,
+                        radius: 9
+                    }).addTo(map);
+
+                    marker.bindPopup(`
+                        <div style="text-align:center">
+                            <b style="font-size:1.2em">${i.nome}</b><br>
+                            <hr>
+                            👣 Passos: ${i.passos}<br>
+                            📏 Distância: ${i.distancia}m<br>
+                            <b style="color:${cor}">${i.dentro ? "EM SEGURANÇA" : "FORA DA ÁREA!"}</b>
+                        </div>
+                    `);
+
+                    markers[i.id] = marker;
+                });
+            })
+            .catch(err => console.error("Erro na API:", err));
+        }
+
+        // Atualizar a cada 5 segundos
+        setInterval(atualizar, 5000);
+        atualizar();
+    </script>
+</body>
+</html>

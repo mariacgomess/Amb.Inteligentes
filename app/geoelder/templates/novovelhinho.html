@@ -1,7 +1,150 @@
-<h2>Novo Idoso</h2>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registar Novo Idoso - GeoElder</title>
+    <style>
+        /* Reset e Fontes */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Guardar</button>
-</form>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Card do Formulário */
+        .form-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .form-card h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 28px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        /* Estilização do Form do Django (as_p) */
+        form p {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #34495e;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Estilizar todos os tipos de input que o Django pode gerar */
+        input[type="text"], 
+        input[type="number"], 
+        input[type="email"], 
+        select, 
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #3498db;
+            background-color: #f7f9fb;
+        }
+
+        /* Botões */
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-save {
+            flex: 2;
+            padding: 14px;
+            background-color: #2ecc71; /* Verde para sucesso/guardar */
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-save:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
+
+        .btn-cancel {
+            flex: 1;
+            padding: 14px;
+            background-color: #95a5a6;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .btn-cancel:hover {
+            background-color: #7f8c8d;
+        }
+
+        /* Ajuste para Checkboxes se existirem */
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-card">
+        <h2>📝 Novo Idoso</h2>
+
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- O Django gera os campos aqui dentro -->
+            {{ form.as_p }}
+
+            <div class="actions">
+                <a href="/" class="btn-cancel">Cancelar</a>
+                <button type="submit" class="btn-save">Guardar Registo</button>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>
