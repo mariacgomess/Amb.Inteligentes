@@ -13,8 +13,14 @@ CLIENT_ID = ""
 CLIENT_SECRET = ""
 REFRESH_TOKEN = ""
 
-def obter_dados_reais():
-    # 1. Obter novo Access Token
+# --- 2. INICIALIZAÇÃO FIREBASE ---
+if not firebase_admin._apps:
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://aims-tp1-default-rtdb.europe-west1.firebasedatabase.app/'
+    })
+
+def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
         "client_id": CLIENT_ID,
@@ -22,85 +28,104 @@ def obter_dados_reais():
         "refresh_token": REFRESH_TOKEN,
         "grant_type": "refresh_token"
     }
-    token_res = requests.post(token_url, data=token_data).json()
-    access_token = token_res.get("access_token")
-    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.post(token_url, data=token_data).json()
+    return res.get("access_token")
 
-    # --- 2. BUSCAR PASSOS ---
-    fit_url_passos = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate"
-    agora = int(datetime.datetime.now().timestamp() * 1000)
+def obter_historico_7_dias(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    agora = int(time.time() * 1000)
+    inicio_7d = agora - (7 * 24 * 60 * 60 * 1000)
+    
+    url = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate"
+    corpo = {
+        "aggregateBy": [{"dataTypeName": "com.google.step_count.delta"}],
+        "bucketByTime": {"durationMillis": 86400000},
+        "startTimeMillis": inicio_7d,
+        "endTimeMillis": agora
+    }
+    
+    res = requests.post(url, headers=headers, json=corpo).json()
+    historico = []
+    for bucket in res.get('bucket', []):
+        ts = int(bucket['startTimeMillis'])
+        data_f = datetime.datetime.fromtimestamp(ts/1000).strftime('%Y-%m-%d')
+        try:
+            p = bucket['dataset'][0]['point'][0]['value'][0]['intVal']
+        except: p = 0
+        historico.append({'data': data_f, 'passos': p})
+    return historico
+
+def obter_dados_atuais(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # --- PASSOS DE HOJE ---
+    agora = int(time.time() * 1000)
     inicio_dia = int(datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
     
-    corpo_passos = {
+    url_p = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate"
+    corpo_p = {
         "aggregateBy": [{"dataTypeName": "com.google.step_count.delta"}],
         "bucketByTime": {"durationMillis": 86400000},
         "startTimeMillis": inicio_dia,
         "endTimeMillis": agora
     }
-    res_passos_json = requests.post(fit_url_passos, headers=headers, json=corpo_passos).json()
-    
+    res_p = requests.post(url_p, headers=headers, json=corpo_p).json()
     try:
-        passos = res_passos_json['bucket'][0]['dataset'][0]['point'][0]['value'][0]['intVal']
-    except (KeyError, IndexError):
-        passos = 0
+        passos = res_p['bucket'][0]['dataset'][0]['point'][0]['value'][0]['intVal']
+    except: passos = 0
 
-    # --- 3. BUSCAR COORDENADAS REAIS ---
-    data_source = "derived:com.google.location.sample:com.google.android.gms:merged_location"
+    # --- LOCALIZAÇÃO (ÚLTIMOS 30 MIN) ---
+    ds = "derived:com.google.location.sample:com.google.android.gms:merged_location"
     agora_ns = int(time.time() * 1000000000)
-    cinco_min_atras_ns = agora_ns - (5 * 60 * 1000000000)
+    janela_ns = agora_ns - (30 * 60 * 1000000000)
     
-    loc_url = f"https://www.googleapis.com/fitness/v1/users/me/dataSources/{data_source}/datasets/{cinco_min_atras_ns}-{agora_ns}"
-    res_loc = requests.get(loc_url, headers=headers).json()
+    url_l = f"https://www.googleapis.com/fitness/v1/users/me/dataSources/{ds}/datasets/{janela_ns}-{agora_ns}"
+    res_l = requests.get(url_l, headers=headers).json()
     
-    lat, lon = 0.0, 0.0
-    try:
-        if "point" in res_loc and len(res_loc["point"]) > 0:
-            ultimo_ponto = res_loc["point"][-1]
-            lat = ultimo_ponto["value"][0]["fpVal"]
-            lon = ultimo_ponto["value"][1]["fpVal"]
-        else:
-            # Fallback se não houver pontos recentes (Braga)
-            lat, lon = 41.5503, -8.4200 
-    except (KeyError, IndexError):
-        lat, lon = 41.5503, -8.4200
-    
+    lat, lon = 41.5503, -8.4200 # Fallback Braga
+    if "point" in res_l and len(res_l["point"]) > 0:
+        lat = res_l["point"][-1]["value"][0]["fpVal"]
+        lon = res_l["point"][-1]["value"][1]["fpVal"]
+
+    res_l = requests.get(url_l, headers=headers).json()
+    print(f"RESPOSTA GPS GOOGLE: {res_l}") # ADICIONA ESTA LINHA
+        
     return passos, lat, lon
 
 def buscar_e_enviar():
-    # Referência para a pasta onde vamos guardar a lista de medições
-    ref_historico = db.reference('monitorizacao/utilizador_01/historico')
+    print("A iniciar Sistema de Monitorização...")
     
-    # Referência para o valor "atual" (opcional, apenas para saber o último valor rápido)
+    # 1. Primeira Sincronização: Importar histórico da semana
+    token = obter_access_token()
+    print("A importar histórico dos últimos 7 dias...")
+    hist = obter_historico_7_dias(token)
+    db.reference('monitorizacao/utilizador_01/estatisticas_semanais').set(hist)
+    
+    # 2. Loop de Tempo Real
+    ref_hist = db.reference('monitorizacao/utilizador_01/historico')
     ref_atual = db.reference('monitorizacao/utilizador_01/atual')
-
-    print("Sistema iniciado! A guardar histórico...")
     
     while True:
         try:
-            p, latitude, longitude = obter_dados_reais()
+            token = obter_access_token() # Atualiza o token a cada volta
+            p, lat, lon = obter_dados_atuais(token)
             
             dados = {
                 'passos': p,
-                'latitude': latitude,
-                'longitude': longitude,
+                'latitude': lat,
+                'longitude': lon,
                 'timestamp': time.time(),
                 'hora_leitura': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
-            # --- AQUI ESTÁ A MUDANÇA ---
-            # .push() adiciona à lista sem apagar o que lá estava
-            ref_historico.push(dados)
-            
-            # .set() no "atual" apenas para termos o último valor num sítio fixo
+            ref_hist.push(dados)
             ref_atual.set(dados)
             
-            print(f"Novo registo guardado no histórico! Passos: {p}")
-            
+            print(f"Sincronizado: {p} passos | Lat: {lat:.4f} Lon: {lon:.4f}")
         except Exception as e:
-            print(f"Erro no loop: {e}")
+            print(f"Erro: {e}")
             
-        # Espera 1 minuto (ou o tempo que o grupo definir)
-        time.sleep(30)
+        time.sleep(60)
 
 if __name__ == "__main__":
     buscar_e_enviar()
