@@ -4,103 +4,129 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, db
 
-cred = credentials.Certificate(r"C:\\Users\\helen\\Desktop\\Mestrado\\2Semestre\\Ambientes Inteligentes\\TPg\\aims-tp1-firebase-adminsdk-fbsvc-7898f84f90.json")
+# --- 1. CONFIGURAÇÕES E FIREBASE ---
+cred_path ="" 
 
-firebase_admin.initialize_app(cred, {'databaseURL': 'https://aims-tp1-default-rtdb.europe-west1.firebasedatabase.app/'})
+if not firebase_admin._apps:
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://aims-tp1-default-rtdb.europe-west1.firebasedatabase.app/'
+    })
 
-# --- CONFIGURAÇÃO GOOGLE FIT ---
-CLIENT_ID = ""
-CLIENT_SECRET = ""
-REFRESH_TOKEN = ""
+#chaves
 
-def obter_dados_reais():
-    # 1. Obter novo Access Token
+def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "refresh_token": REFRESH_TOKEN,
+        "client_id": "CLIENT_ID",
+        "client_secret": "CLIENT_SECRET",
+        "refresh_token": "REFRESH_TOKEN",
         "grant_type": "refresh_token"
     }
-    token_res = requests.post(token_url, data=token_data).json()
-    access_token = token_res.get("access_token")
+    res = requests.post(token_url, data=token_data).json()
+    return res.get("access_token")
+
+def obter_historico_7_dias(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
-
-    # --- 2. BUSCAR PASSOS ---
-    fit_url_passos = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate"
-    agora = int(datetime.datetime.now().timestamp() * 1000)
-    inicio_dia = int(datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
     
-    corpo_passos = {
-        "aggregateBy": [{"dataTypeName": "com.google.step_count.delta"}],
-        "bucketByTime": {"durationMillis": 86400000},
-        "startTimeMillis": inicio_dia,
-        "endTimeMillis": agora
-    }
-    res_passos_json = requests.post(fit_url_passos, headers=headers, json=corpo_passos).json()
+    # Usamos a fonte "estimated_steps" que é a que a App Google Fit usa para o gráfico
+    ds_estimado = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
     
-    try:
-        passos = res_passos_json['bucket'][0]['dataset'][0]['point'][0]['value'][0]['intVal']
-    except (KeyError, IndexError):
-        passos = 0
+    historico = []
+    
+    # Em vez de um aggregate de 7 dias de uma vez, vamos pedir dia a dia
+    # para garantir que os limites de tempo (meia-noite) estão corretos
+    for i in range(6, -1, -1):  # De 6 dias atrás até hoje (0)
+        data_alvo = datetime.datetime.now() - datetime.timedelta(days=i)
+        
+        # Definir início e fim do dia (meia-noite às 23:59:59)
+        inicio_dia = data_alvo.replace(hour=0, minute=0, second=0, microsecond=0)
+        fim_dia = data_alvo.replace(hour=23, minute=59, second=59, microsecond=999)
+        
+        inicio_ns = int(inicio_dia.timestamp() * 1000000000)
+        fim_ns = int(fim_dia.timestamp() * 1000000000)
+        
+        url = f"https://www.googleapis.com/fitness/v1/users/me/dataSources/{ds_estimado}/datasets/{inicio_ns}-{fim_ns}"
+        
+        try:
+            res = requests.get(url, headers=headers).json()
+            passos_do_dia = 0
+            if "point" in res:
+                for ponto in res["point"]:
+                    passos_do_dia += ponto["value"][0]["intVal"]
+            
+            data_str = inicio_dia.strftime('%Y-%m-%d')
+            historico.append({'data': data_str, 'passos': passos_do_dia})
+            print(f"📊 {data_str}: {passos_do_dia} passos (Recuperados)")
+            
+        except Exception as e:
+            print(f"⚠️ Erro no dia {i}: {e}")
+            
+    return historico
 
-    # --- 3. BUSCAR COORDENADAS REAIS ---
-    data_source = "derived:com.google.location.sample:com.google.android.gms:merged_location"
+def obter_passos_atuais(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # Esta é a fonte de "Passos Estimados" que junta sensores e correções da App
+    # É a que mais se aproxima do valor real do ecrã
+    ds_estimado = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
+    
     agora_ns = int(time.time() * 1000000000)
-    cinco_min_atras_ns = agora_ns - (5 * 60 * 1000000000)
+    # Vamos buscar desde o início do dia de hoje (meia-noite) até agora
+    inicio_dia = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    inicio_ns = int(inicio_dia.timestamp() * 1000000000)
     
-    loc_url = f"https://www.googleapis.com/fitness/v1/users/me/dataSources/{data_source}/datasets/{cinco_min_atras_ns}-{agora_ns}"
-    res_loc = requests.get(loc_url, headers=headers).json()
+    url = f"https://www.googleapis.com/fitness/v1/users/me/dataSources/{ds_estimado}/datasets/{inicio_ns}-{agora_ns}"
     
-    lat, lon = 0.0, 0.0
     try:
-        if "point" in res_loc and len(res_loc["point"]) > 0:
-            ultimo_ponto = res_loc["point"][-1]
-            lat = ultimo_ponto["value"][0]["fpVal"]
-            lon = ultimo_ponto["value"][1]["fpVal"]
-        else:
-            # Fallback se não houver pontos recentes (Braga)
-            lat, lon = 41.5503, -8.4200 
-    except (KeyError, IndexError):
-        lat, lon = 41.5503, -8.4200
-    
-    return passos, lat, lon
+        res = requests.get(url, headers=headers).json()
+        total_passos = 0
+        
+        # Somamos todos os pontos de passos registados hoje nesta fonte
+        if "point" in res:
+            for ponto in res["point"]:
+                total_passos += ponto["value"][0]["intVal"]
+        
+        return total_passos
+    except Exception as e:
+        print(f"⚠️ Erro ao ler passos reais: {e}")
+        return 0
 
 def buscar_e_enviar():
-    # Referência para a pasta onde vamos guardar a lista de medições
-    ref_historico = db.reference('monitorizacao/utilizador_01/historico')
+    print("🚀 A iniciar Sistema de Monitorização (Apenas Passos)...")
     
-    # Referência para o valor "atual" (opcional, apenas para saber o último valor rápido)
+    token = obter_access_token()
+    if token:
+        print("📊 A importar histórico semanal...")
+        hist = obter_historico_7_dias(token)
+        db.reference('monitorizacao/utilizador_01/estatisticas_semanais').set(hist)
+    
+    ref_hist = db.reference('monitorizacao/utilizador_01/historico')
     ref_atual = db.reference('monitorizacao/utilizador_01/atual')
-
-    print("Sistema iniciado! A guardar histórico...")
     
     while True:
         try:
-            p, latitude, longitude = obter_dados_reais()
+            token = obter_access_token() 
+            p = obter_passos_atuais(token)
             
+            # Usamos update em vez de set para não apagar a latitude/longitude 
+            # que o telemóvel está a enviar em paralelo
             dados = {
                 'passos': p,
-                'latitude': latitude,
-                'longitude': longitude,
                 'timestamp': time.time(),
                 'hora_leitura': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
-            # --- AQUI ESTÁ A MUDANÇA ---
-            # .push() adiciona à lista sem apagar o que lá estava
-            ref_historico.push(dados)
+            ref_atual.update(dados)
+            # Para o histórico, guardamos o registo dos passos
+            ref_hist.push(dados)
             
-            # .set() no "atual" apenas para termos o último valor num sítio fixo
-            ref_atual.set(dados)
-            
-            print(f"Novo registo guardado no histórico! Passos: {p}")
+            print(f"✅ Passos Sincronizados: {p}")
             
         except Exception as e:
-            print(f"Erro no loop: {e}")
+            print(f"❌ Erro no loop: {e}")
             
-        # Espera 1 minuto (ou o tempo que o grupo definir)
-        time.sleep(30)
+        time.sleep(600)
 
 if __name__ == "__main__":
     buscar_e_enviar()
