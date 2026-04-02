@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil Clínico - {{ idoso.nome }}</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-bottom: 50px;
+        }
+
+        /* BANNER E FOTO DE PERFIL */
+        .profile-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+            height: 200px;
+            border-radius: 0 0 20px 20px;
+            position: relative;
+            margin-bottom: 80px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .profile-avatar {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 5px solid white;
+            position: absolute;
+            bottom: -75px;
+            left: 50px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            object-fit: cover;
+            background-color: white;
+        }
+        .profile-name-header {
+            position: absolute;
+            bottom: -60px;
+            left: 220px;
+        }
+
+        /* CARTÕES DE ESTATÍSTICAS (MINI-CARDS) */
+        .kpi-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            transition: transform 0.2s;
+            border: 1px solid #e9ecef;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+        .kpi-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        /* CARTÕES NORMAIS */
+        .card-custom {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            border: none;
+            height: 100%;
+        }
+        .card-title-custom {
+            font-weight: 700;
+            color: #344767;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        /* TIMELINE DE ATIVIDADE */
+        .timeline {
+            border-left: 2px solid #e9ecef;
+            padding-left: 20px;
+            margin-left: 10px;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -27px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #0d6efd;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #0d6efd;
+        }
+        .timeline-item.danger::before { background: #dc3545; box-shadow: 0 0 0 2px #dc3545; }
+        .timeline-item.success::before { background: #198754; box-shadow: 0 0 0 2px #198754; }
+        
+        .badge-doenca {
+            font-size: 0.85rem;
+            padding: 8px 15px;
+            border-radius: 20px;
+            background-color: #ffe0e0;
+            color: #d63384;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-light bg-white shadow-sm px-4 py-3">
+        <a href="javascript:history.back()" class="btn btn-light fw-bold text-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Voltar ao Dashboard
+        </a>
+        <span class="fw-bold text-primary"><i class="fas fa-hospital-user me-2"></i>Sistema GeoElder</span>
+    </nav>
+
+    <div class="container-fluid px-0">
+        <div class="profile-header mx-3 mt-3">
+            <img src="https://cdn-icons-png.flaticon.com/512/3532/3532649.png" alt="Utente" class="profile-avatar">
+            <div class="profile-name-header">
+                <h2 class="fw-bold mb-0 text-dark">{{ idoso.nome }}</h2>
+                <span class="badge bg-secondary fs-6"><i class="fas fa-home me-1"></i> {{ idoso.lar.nome }}</span>
+                {% if dados.dentro %}
+                    <span class="badge bg-success fs-6 ms-2"><i class="fas fa-shield-alt me-1"></i> Seguro</span>
+                {% else %}
+                    <span class="badge bg-danger fs-6 ms-2"><i class="fas fa-exclamation-triangle me-1"></i> Fora de Zona</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-5 pt-3">
+        
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="kpi-card border-bottom border-primary border-4">
+                    <div>
+                        <p class="text-muted mb-1 fw-bold" style="font-size: 0.8rem;">PASSOS HOJE</p>
+                        <h3 class="fw-bold mb-0 text-dark" id="val-passos">{{ dados.passos|default:"0" }}</h3>
+                    </div>
+                    <div class="kpi-icon bg-primary bg-opacity-10 text-primary">
+                        <i class="fas fa-shoe-prints"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="kpi-card border-bottom border-success border-4">
+                    <div>
+                        <p class="text-muted mb-1 fw-bold" style="font-size: 0.8rem;">DISTÂNCIA PERCORRIDA</p>
+                        <h3 class="fw-bold mb-0 text-dark"><span id="val-km">0.00</span> <small class="text-muted fs-6">km</small></h3>
+                    </div>
+                    <div class="kpi-icon bg-success bg-opacity-10 text-success">
+                        <i class="fas fa-route"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="kpi-card border-bottom border-warning border-4">
+                    <div>
+                        <p class="text-muted mb-1 fw-bold" style="font-size: 0.8rem;">CALORIAS QUEIMADAS</p>
+                        <h3 class="fw-bold mb-0 text-dark"><span id="val-kcal">0</span> <small class="text-muted fs-6">kcal</small></h3>
+                    </div>
+                    <div class="kpi-icon bg-warning bg-opacity-10 text-warning">
+                        <i class="fas fa-fire-alt"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="kpi-card border-bottom border-danger border-4">
+                    <div>
+                        <p class="text-muted mb-1 fw-bold" style="font-size: 0.8rem;">DISTÂNCIA AO LAR</p>
+                        <h3 class="fw-bold mb-0 text-dark">{{ dados.distancia|default:"0" }} <small class="text-muted fs-6">m</small></h3>
+                    </div>
+                    <div class="kpi-icon bg-danger bg-opacity-10 text-danger">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card-custom">
+                    <h5 class="card-title-custom"><i class="fas fa-notes-medical text-danger me-2"></i>Ficha Clínica do Utente</h5>
+                    <div class="row mt-4">
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted fw-bold" style="font-size: 0.8rem;">IDADE</label>
+                            <p class="fs-5 fw-bold text-dark">{{ idoso.idade }} anos</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted fw-bold" style="font-size: 0.8rem;">GÉNERO</label>
+                            <p class="fs-5 fw-bold text-dark">{{ idoso.get_sexo_display }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted fw-bold" style="font-size: 0.8rem;">CONTATO EMERGÊNCIA</label>
+                            <p class="fs-5 fw-bold text-dark"><i class="fas fa-phone-alt text-success me-2"></i>912 345 678</p>
+                        </div>
+                    </div>
+                    
+                    <hr class="text-muted opacity-25">
+                    
+                    <label class="text-muted fw-bold mb-2" style="font-size: 0.8rem;">PATOLOGIAS / CONDIÇÕES</label>
+                    <div>
+                        <span class="badge-doenca"><i class="fas fa-virus me-1"></i> {{ idoso.doencas }}</span>
+                        <span class="badge-doenca ms-2" style="background-color: #fff3cd; color: #ffc107;"><i class="fas fa-pills me-1"></i> Medicação Regular</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card-custom text-center d-flex flex-column justify-content-center">
+                    <h5 class="card-title-custom mb-0"><i class="fas fa-bullseye text-primary me-2"></i>Progresso Diário</h5>
+                    <p class="text-muted small mb-4">Meta: {{ idoso.daily_step_goal }} passos</p>
+                    
+                    <div style="height: 200px; width: 100%; display: flex; justify-content: center;">
+                        <canvas id="progressoChart"></canvas>
+                    </div>
+                    
+                    <h3 class="fw-bold mt-3 mb-0 text-success" id="percentagem-meta">0%</h3>
+                    <span class="text-muted small fw-bold">da meta atingida</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card-custom">
+                    <h5 class="card-title-custom"><i class="fas fa-history text-info me-2"></i>Atividade Recente</h5>
+                    
+                    <div class="timeline mt-4">
+                        <div class="timeline-item success">
+                            <small class="text-muted fw-bold">Agora mesmo</small>
+                            <p class="mb-0 fw-bold text-dark">Localização Atualizada</p>
+                            <span class="text-muted small">Dispositivo sincronizado com sucesso.</span>
+                        </div>
+                        
+                        {% if not dados.dentro %}
+                        <div class="timeline-item danger">
+                            <small class="text-muted fw-bold text-danger">Alerta Recente</small>
+                            <p class="mb-0 fw-bold text-dark">Quebra de Geofence</p>
+                            <span class="text-muted small">Utente ultrapassou o raio de {{ idoso.lar.radius }}m.</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="timeline-item">
+                            <small class="text-muted fw-bold">08:30 AM</small>
+                            <p class="mb-0 fw-bold text-dark">Início de Atividade</p>
+                            <span class="text-muted small">Primeiros passos registados hoje.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card-custom">
+                    <h5 class="card-title-custom"><i class="fas fa-chart-line text-success me-2"></i>Atividade dos últimos 7 dias</h5>
+                    <div style="height: 300px; width: 100%;">
+                        <canvas id="historicoChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Dados Iniciais
+        const passosHoje = parseInt("{{ dados.passos|default:'0' }}");
+        const metaPassos = parseInt("{{ idoso.daily_step_goal|default:'2000' }}");
+        
+        // 2. Cálculos Automáticos Fixes!
+        // Um passo médio tem cerca de 0.762 metros
+        const kmPercorridos = (passosHoje * 0.000762).toFixed(2);
+        // Em média queima-se 0.04 calorias por passo
+        const caloriasQueimadas = Math.round(passosHoje * 0.04);
+        
+        // Atualizar HTML com os cálculos
+        document.getElementById('val-km').innerText = kmPercorridos;
+        document.getElementById('val-kcal').innerText = caloriasQueimadas;
+
+        // Calcular percentagem da meta
+        let percentagem = Math.round((passosHoje / metaPassos) * 100);
+        if(percentagem > 100) percentagem = 100;
+        document.getElementById('percentagem-meta').innerText = percentagem + "%";
+
+        const passosFaltam = metaPassos - passosHoje > 0 ? metaPassos - passosHoje : 0;
+
+        // ==========================================
+        // GRÁFICO 1: DOUGHNUT (Progresso Diário)
+        // ==========================================
+        const ctxProgresso = document.getElementById('progressoChart').getContext('2d');
+        new Chart(ctxProgresso, {
+            type: 'doughnut',
+            data: {
+                labels: ['Dados', 'Faltam'],
+                datasets: [{
+                    data: [passosHoje, passosFaltam],
+                    backgroundColor: ['#198754', '#e9ecef'],
+                    borderWidth: 0,
+                    borderRadius: 5, // Cantos arredondados na barra circular!
+                    cutout: '80%' // Faz o anel mais fininho e moderno
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }, // Ocultar legenda para ficar mais limpo
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) { return context.label + ': ' + context.raw + ' passos'; }
+                        }
+                    }
+                }
+            }
+        });
+
+        // ==========================================
+        // GRÁFICO 2: LINHAS (Semanal)
+        // ==========================================
+        const ctxHistorico = document.getElementById('historicoChart').getContext('2d');
+        
+        // Criar um gradiente azul bonito para preencher a linha
+        let gradient = ctxHistorico.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(13, 110, 253, 0.4)'); // Azul escuro no topo
+        gradient.addColorStop(1, 'rgba(13, 110, 253, 0.0)'); // Transparente em baixo
+
+        new Chart(ctxHistorico, {
+            type: 'line',
+            data: {
+                labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Hoje'],
+                datasets: [{
+                    label: 'Passos Registados',
+                    data: [1200, 1900, 1500, 2100, 1800, 2400, passosHoje], // Hoje tem o real!
+                    borderColor: '#0d6efd',
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4, // Curvas suaves
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#0d6efd',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Meta',
+                    data: [metaPassos, metaPassos, metaPassos, metaPassos, metaPassos, metaPassos, metaPassos],
+                    borderColor: '#adb5bd',
+                    borderWidth: 2,
+                    borderDash: [5, 5], // Tracejado
+                    fill: false,
+                    pointRadius: 0 // Esconder as bolinhas nesta linha
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { position: 'top', align: 'end' }
+                },
+                scales: {
+                    x: { grid: { display: false } }, // Remove grelha vertical
+                    y: { 
+                        beginAtZero: true,
+                        grid: { borderDash: [2, 4], color: '#f0f2f5' }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
