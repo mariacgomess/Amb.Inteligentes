@@ -111,6 +111,7 @@
         }
         .timeline-item.danger::before { background: #dc3545; box-shadow: 0 0 0 2px #dc3545; }
         .timeline-item.success::before { background: #198754; box-shadow: 0 0 0 2px #198754; }
+        .timeline-item.warning::before { background: #ffc107; box-shadow: 0 0 0 2px #ffc107; }
         
         .badge-doenca {
             font-size: 0.85rem;
@@ -137,10 +138,23 @@
             <div class="profile-name-header">
                 <h2 class="fw-bold mb-0 text-dark">{{ idoso.nome }}</h2>
                 <span class="badge bg-secondary fs-6"><i class="fas fa-home me-1"></i> {{ idoso.lar.nome }}</span>
+                
                 {% if dados.dentro %}
                     <span class="badge bg-success fs-6 ms-2"><i class="fas fa-shield-alt me-1"></i> Seguro</span>
                 {% else %}
                     <span class="badge bg-danger fs-6 ms-2"><i class="fas fa-exclamation-triangle me-1"></i> Fora de Zona</span>
+                {% endif %}
+
+                {% if dados.status_ativo == "Ativo" %}
+                    <span class="badge bg-primary fs-6 ms-2 shadow-sm"><i class="fas fa-walking me-1"></i> Em Movimento</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6 ms-2 shadow-sm"><i class="fas fa-bed me-1"></i> Em Repouso</span>
+                {% endif %}
+
+                {% if dados.intensidade %}
+                    <span class="badge rounded-pill bg-info text-dark fs-6 ms-2 shadow-sm">
+                        <i class="fas fa-bolt me-1"></i> {{ dados.intensidade }}
+                    </span>
                 {% endif %}
             </div>
         </div>
@@ -221,6 +235,12 @@
                         <span class="badge-doenca"><i class="fas fa-virus me-1"></i> {{ idoso.doencas }}</span>
                         <span class="badge-doenca ms-2" style="background-color: #fff3cd; color: #ffc107;"><i class="fas fa-pills me-1"></i> Medicação Regular</span>
                     </div>
+
+                    {% if dados.minutos_inativo > 60 %}
+                    <div class="alert alert-warning py-2 mt-4 mb-0 shadow-sm border-0" role="alert" style="font-size: 0.85rem;">
+                        <i class="fas fa-couch me-2"></i> <strong>Atenção:</strong> Utente em sedentarismo prolongado (+{{ dados.minutos_inativo|floatformat:0 }} min).
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -246,23 +266,33 @@
                     
                     <div class="timeline mt-4">
                         <div class="timeline-item success">
-                            <small class="text-muted fw-bold">Agora mesmo</small>
+                            <small class="text-muted fw-bold">Última Leitura: {{ dados.hora_leitura|default:"Desconhecido" }}</small>
                             <p class="mb-0 fw-bold text-dark">Localização Atualizada</p>
-                            <span class="text-muted small">Dispositivo sincronizado com sucesso.</span>
+                            <span class="text-muted small">GPS e passos registados com sucesso.</span>
                         </div>
                         
                         {% if not dados.dentro %}
                         <div class="timeline-item danger">
-                            <small class="text-muted fw-bold text-danger">Alerta Recente</small>
+                            <small class="text-muted fw-bold text-danger">ALERTA ATIVO</small>
                             <p class="mb-0 fw-bold text-dark">Quebra de Geofence</p>
-                            <span class="text-muted small">Utente ultrapassou o raio de {{ idoso.lar.radius }}m.</span>
+                            <span class="text-muted small">O utente ultrapassou a zona de segurança!</span>
                         </div>
                         {% endif %}
 
+                        <div class="timeline-item warning">
+                            <small class="text-muted fw-bold">Análise de Atividade</small>
+                            <p class="mb-0 fw-bold text-dark">Estatuto: {{ dados.intensidade|default:"Repouso" }}</p>
+                            <span class="text-muted small">
+                                Inatividade acumulada: <strong class="text-danger">{{ dados.minutos_inativo|floatformat:1 }}</strong> minutos.
+                            </span>
+                        </div>
+
                         <div class="timeline-item">
-                            <small class="text-muted fw-bold">08:30 AM</small>
-                            <p class="mb-0 fw-bold text-dark">Início de Atividade</p>
-                            <span class="text-muted small">Primeiros passos registados hoje.</span>
+                            <small class="text-muted fw-bold">Meta de Passos</small>
+                            <p class="mb-0 fw-bold text-dark">Movimento Diário</p>
+                            <span class="text-muted small">
+                                Já foram dados <strong class="text-primary">{{ dados.passos|default:"0" }}</strong> passos de uma meta de {{ idoso.daily_step_goal }}.
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -270,7 +300,18 @@
 
             <div class="col-lg-8">
                 <div class="card-custom">
-                    <h5 class="card-title-custom"><i class="fas fa-chart-line text-success me-2"></i>Atividade dos últimos 7 dias</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="card-title-custom mb-0"><i class="fas fa-chart-line text-success me-2"></i>Atividade dos últimos 7 dias</h5>
+                        <div class="text-end">
+                            <span class="badge bg-info bg-opacity-10 text-info me-2 fs-6 px-3 py-2 border border-info border-opacity-25">
+                                <i class="fas fa-calculator me-1"></i> Média: {{ media_semanal|default:"0" }}
+                            </span>
+                            <span class="badge bg-warning bg-opacity-10 text-warning fs-6 px-3 py-2 border border-warning border-opacity-25">
+                                <i class="fas fa-trophy me-1"></i> Recorde: {{ recorde_semana|default:"0" }}
+                            </span>
+                        </div>
+                    </div>
+                    
                     <div style="height: 300px; width: 100%;">
                         <canvas id="historicoChart"></canvas>
                     </div>
@@ -286,16 +327,12 @@
         const metaPassos = parseInt("{{ idoso.daily_step_goal|default:'2000' }}");
         
         // 2. Cálculos Automáticos Fixes!
-        // Um passo médio tem cerca de 0.762 metros
         const kmPercorridos = (passosHoje * 0.000762).toFixed(2);
-        // Em média queima-se 0.04 calorias por passo
         const caloriasQueimadas = Math.round(passosHoje * 0.04);
         
-        // Atualizar HTML com os cálculos
         document.getElementById('val-km').innerText = kmPercorridos;
         document.getElementById('val-kcal').innerText = caloriasQueimadas;
 
-        // Calcular percentagem da meta
         let percentagem = Math.round((passosHoje / metaPassos) * 100);
         if(percentagem > 100) percentagem = 100;
         document.getElementById('percentagem-meta').innerText = percentagem + "%";
@@ -314,15 +351,15 @@
                     data: [passosHoje, passosFaltam],
                     backgroundColor: ['#198754', '#e9ecef'],
                     borderWidth: 0,
-                    borderRadius: 5, // Cantos arredondados na barra circular!
-                    cutout: '80%' // Faz o anel mais fininho e moderno
+                    borderRadius: 5, 
+                    cutout: '80%'
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }, // Ocultar legenda para ficar mais limpo
+                    legend: { display: false }, 
                     tooltip: {
                         callbacks: {
                             label: function(context) { return context.label + ': ' + context.raw + ' passos'; }
@@ -333,27 +370,37 @@
         });
 
         // ==========================================
-        // GRÁFICO 2: LINHAS (Semanal)
+        // GRÁFICO 2: LINHAS (Semanal - CORRIGIDO!)
         // ==========================================
         const ctxHistorico = document.getElementById('historicoChart').getContext('2d');
         
-        // Criar um gradiente azul bonito para preencher a linha
         let gradient = ctxHistorico.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(13, 110, 253, 0.4)'); // Azul escuro no topo
-        gradient.addColorStop(1, 'rgba(13, 110, 253, 0.0)'); // Transparente em baixo
+        gradient.addColorStop(0, 'rgba(13, 110, 253, 0.4)'); 
+        gradient.addColorStop(1, 'rgba(13, 110, 253, 0.0)'); 
+
+        // 1. Lógica dos dias dinâmicos (O Último é Hoje)
+        const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const labelsDinamicas = [];
+        for (let i = 6; i >= 0; i--) {
+            let data = new Date();
+            data.setDate(data.getDate() - i);
+            labelsDinamicas.push(nomesDias[data.getDay()]);
+        }
+
+        const historicoReal = {{ passos_semana|safe }};
 
         new Chart(ctxHistorico, {
             type: 'line',
             data: {
-                labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Hoje'],
+                labels: labelsDinamicas, 
                 datasets: [{
                     label: 'Passos Registados',
-                    data: [1200, 1900, 1500, 2100, 1800, 2400, passosHoje], // Hoje tem o real!
+                    data: historicoReal, 
                     borderColor: '#0d6efd',
                     backgroundColor: gradient,
                     borderWidth: 3,
                     fill: true,
-                    tension: 0.4, // Curvas suaves
+                    tension: 0.4, 
                     pointBackgroundColor: '#fff',
                     pointBorderColor: '#0d6efd',
                     pointBorderWidth: 2,
@@ -365,23 +412,18 @@
                     data: [metaPassos, metaPassos, metaPassos, metaPassos, metaPassos, metaPassos, metaPassos],
                     borderColor: '#adb5bd',
                     borderWidth: 2,
-                    borderDash: [5, 5], // Tracejado
+                    borderDash: [5, 5], 
                     fill: false,
-                    pointRadius: 0 // Esconder as bolinhas nesta linha
+                    pointRadius: 0 
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    legend: { position: 'top', align: 'end' }
-                },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'top', align: 'end' } },
                 scales: {
-                    x: { grid: { display: false } }, // Remove grelha vertical
+                    x: { grid: { display: false } }, 
                     y: { 
                         beginAtZero: true,
                         grid: { borderDash: [2, 4], color: '#f0f2f5' }
