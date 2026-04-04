@@ -6,5 +6,5 @@ urlpatterns=[
     path("mapa/",views.mapa, name="mapa"),
     path("api/localizacoes/", views.get_localizacoes, name="api_localizacoes"),
     path('adicionarvelhinho/', views.criar_idoso, name="novovelhinho"),
-    path('perfil/<int:id_idoso>/', views.perfil_idoso, name='perfil_idoso'),
+    path('perfil/<int:id>/', views.perfil, name='perfil_idoso'),
 ]

@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from geopy.distance import geodesic
 from django.contrib.auth import authenticate, login
 from .models import Velhinho
 from .forms import VelhinhoForm
@@ -8,6 +7,10 @@ from .firebase_service import get_dados_idoso
 from django.contrib.auth.decorators import login_required
 from geopy.distance import geodesic # Se não tiveres: pip install geopy
 import requests
+from firebase_admin import db
+from datetime import datetime
+from datetime import date
+
 
 @login_required
 def get_localizacoes(request):
@@ -24,22 +27,34 @@ def get_localizacoes(request):
         dados = get_dados_idoso(f'utilizador_0{i.id}') 
         
         if dados:
-            # === CORREÇÃO AQUI: Ler os nomes EXATOS que estão no Firebase ===
             lat = dados.get('lat_atual')
             lng = dados.get('lon_atual')
             distancia = dados.get('distancia', 0)
-            passos = dados.get('passos', 0) # Não está na imagem, mas default para 0 protege o erro
-            
-            # Como o Firebase tem 'fora_de_zona: true', o 'dentro' é o inverso!
+            passos = dados.get('passos', 0)
             fora_de_zona = dados.get('fora_de_zona', False)
             dentro = not fora_de_zona
-            # ================================================================
+            
+            # --- NOVO: Obter Clima Real para este Idoso ---
+            # Chamamos a tua função enviando a lat/lng do Firebase
+            clima_data = consultar_clima_dinamico(lat, lng) 
         else:
             lat = lar.center_lat if lar else 41.5607
             lng = lar.center_lng if lar else -8.3972
             passos = 0
             distancia = 0
             dentro = True
+            clima_data = None
+
+        # Montamos o objeto de clima para o JSON
+        clima_json = {
+            "temp": clima_data.get("temp") if clima_data else "--",
+            "desc": clima_data.get("desc") if clima_data else "Sem dados",
+            "icone_url": clima_data.get("icone_url") if clima_data else "",
+            "humidade": clima_data.get("humidade") if clima_data else 0,
+            "vento": clima_data.get("vento") if clima_data else 0,
+            "cidade": clima_data.get("cidade_atual") if clima_data else "Desconhecido",
+            "qualidade_ar": clima_data.get("qualidade_ar") if clima_data else "Boa"
+        }
 
         resultado.append({
             "id": i.id,
@@ -48,43 +63,58 @@ def get_localizacoes(request):
             "lng": lng,
             "distancia": distancia,    
             "dentro": dentro,          
-            "passos": passos
+            "passos": passos,
+            "clima": clima_json  # Enviamos o pacote de clima para o JS
         })
 
     return JsonResponse(resultado, safe=False)
 
-from django.shortcuts import render
-
-@login_required
-def mapa(request):
-    # 1. Obter Clima (OpenWeather)
+def consultar_clima_dinamico(lat, lon):
     api_key = "4fa221e40fa0935eb478acfd7ea2c6f4"
-    city_name = "Braga"
-    url = f"http://api.openweathermap.org/data/2.5/weather?appid={api_key}&q={city_name}&units=metric&lang=pt"
+    url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=pt"
     
-    clima = {"temp": 0, "desc": "Sem Dados", "chuva": False, "icone_url": ""}
     try:
-        res = requests.get(url).json()
-        clima = {
-            "temp": round(res["main"]["temp"]),
-            "desc": res["weather"][0]["description"],
-            # Deteta palavras de chuva em inglês ou português
-            "chuva": any(palavra in res["weather"][0]["description"].lower() for palavra in ["rain", "drizzle", "chuva", "chuvisco", "trovoada"]),
-            "humidade": res["main"]["humidity"],
-            "vento": round(res["wind"]["speed"] * 3.6),
-            "icone_url": f"http://openweathermap.org/img/wn/{res['weather'][0]['icon']}@2x.png"
-        }
-    except Exception as e: 
-        print("Erro no OpenWeather:", e)
+        response = requests.get(url, timeout=3)
+        x = response.json()
 
-    # 2. Tentar obter o lar do utilizador logado de forma SEGURA
+        if x["cod"] == 200:
+            desc = x["weather"][0]["description"].lower() # Pegamos a descrição
+            return {
+                "temp": round(x["main"]["temp"]),
+                "feels_like": round(x["main"]["feels_like"]),
+                "humidade": x["main"]["humidity"],
+                "vento": round(x["wind"]["speed"] * 3.6),
+                "desc": desc,
+                "icone_url": f"http://openweathermap.org/img/wn/{x['weather'][0]['icon']}@2x.png",
+                "cidade_atual": x.get("name", "Localização Remota"),
+                # ADICIONA ESTA LINHA ABAIXO:
+                "chuva": any(p in desc for p in ["chuva", "rain", "chuvisco", "drizzle", "trovoada"])
+            }
+    except Exception as e:
+        print(f"Erro no clima: {e}")
+    return None
+
+def mapa(request):
     try:
         lar_user = request.user.lar
         idosos = Velhinho.objects.filter(lar=lar_user)
-    except Exception:
-        # Se der erro (ex: é o Admin e não tem Lar), mostra todos para não crashar!
+    except:
         lar_user = None
         idosos = Velhinho.objects.all()
+
+    # 1. Tentar obter o clima baseado na posição do PRIMEIRO idoso
+    clima = {"temp": "--", "desc": "Sem Dados", "chuva": False} # Valor padrão
+    
+    
+    if idosos.exists():
+        primeiro_idoso = idosos.first()
+        dados_fb = get_dados_idoso(f'utilizador_0{primeiro_idoso.id}')
+        
+        if dados_fb and 'lat_atual' in dados_fb:
+            # CHAMADA DINÂMICA: Clima de onde o idoso está mesmo!
+            clima_real = consultar_clima_dinamico(dados_fb['lat_atual'], dados_fb['lon_atual'])
+            if clima_real:
+                clima = clima_real
 
     notificacoes = []
 
@@ -152,13 +182,14 @@ def mapa(request):
             "icon": "fa-umbrella"
         })
 
+    # No final da função mapa:
     context = {
         'clima': clima,
         'notificacoes': notificacoes,
         'total_notificacoes': len(notificacoes)
     }
-    
     return render(request, 'mapa.html', context)
+    
 
 from django.contrib import messages  # Importante importar isto!
 
@@ -197,17 +228,55 @@ def criar_idoso(request):
 
 from django.shortcuts import get_object_or_404
 
+import json # Adiciona isto no topo do ficheiro se não tiveres
+
 @login_required
-def perfil_idoso(request, id_idoso):
-    # Vai buscar o velhinho à base de dados ou dá erro 404 se não existir
-    idoso = get_object_or_404(Velhinho, id=id_idoso)
+def perfil(request, id):
+    idoso = get_object_or_404(Velhinho, id=id)
     
-    # Vamos também buscar os dados em tempo real ao Firebase para mostrar na página!
-    dados_tempo_real = get_dados_idoso(f'utilizador_0{idoso.id}')
+    # 1. Dados em Tempo Real
+    ref_atual = db.reference(f'monitorizacao/utilizador_0{idoso.id}/atual').get() or {}
+    ref_tratado = db.reference(f'monitorizacao/utilizador_0{idoso.id}/localizacao_tratada').get() or {}
     
-    contexto = {
+    # Injetar dados vivos no objeto que vai para o HTML
+    ref_tratado['hora_leitura'] = ref_atual.get('hora_leitura', "---")
+    ref_tratado['status_ativo'] = ref_atual.get('status', "Inativo") # Novo campo real!
+
+    # 2. Dados Históricos (Estatísticas)
+    ref_semanal = db.reference(f'monitorizacao/utilizador_0{idoso.id}/estatisticas_semanais').get()
+    
+    passos_semana = [0, 0, 0, 0, 0, 0, 0]
+    total_passos_semana = 0
+    dias_com_dados = 0
+    
+    from datetime import date, datetime
+    hoje = date.today()
+    
+    if ref_semanal:
+        lista_dados = ref_semanal.values() if isinstance(ref_semanal, dict) else ref_semanal
+        for item in lista_dados:
+            if item and isinstance(item, dict) and 'data' in item:
+                try:
+                    data_registo = datetime.strptime(item['data'], '%Y-%m-%d').date()
+                    diff = (hoje - data_registo).days
+                    if 0 <= diff <= 6:
+                        idx = 6 - diff
+                        val = item.get('passos', 0)
+                        passos_semana[idx] = val
+                        total_passos_semana += val
+                        if val > 0: dias_com_dados += 1
+                except: pass
+
+    # Cálculos Reais para o Perfil
+    media_semanal = round(total_passos_semana / dias_com_dados) if dias_com_dados > 0 else 0
+    recorde_semana = max(passos_semana)
+
+    context = {
         'idoso': idoso,
-        'dados': dados_tempo_real
+        'dados': ref_tratado,
+        'passos_semana': json.dumps(passos_semana),
+        'media_semanal': media_semanal, # Manda para o HTML
+        'recorde_semana': recorde_semana, # Manda para o HTML
+        'total_semana': total_passos_semana
     }
-    
-    return render(request, 'perfil.html', contexto)
+    return render(request, 'perfil.html', context)

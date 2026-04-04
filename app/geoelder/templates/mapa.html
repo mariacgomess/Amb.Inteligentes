@@ -28,7 +28,31 @@
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             border: 3px solid white;
+            transition: all 0.3s ease; /* Transição suave ao expandir */
         }
+
+        /* Sidebar de Utentes Retrátil */
+        .utentes-sidebar {
+            background: white;
+            border-radius: 15px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        /* Classe para esconder a sidebar */
+        .sidebar-hidden {
+            display: none !important;
+        }
+
+        .utente-item {
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+        .utente-item:hover { background: #f8f9fa; border-left-color: #0d6efd; }
+        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
 
         .side-card {
             background: white;
@@ -74,48 +98,31 @@
             font-size: 0.9em;
         }
 
-        .custom-avatar-icon {
-            background: none;
-            border: none;
-        }
+        .custom-avatar-icon { background: none; border: none; }
         .avatar-pin {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: white;
-            border: 4px solid;
+            width: 50px; height: 50px; border-radius: 50%;
+            background-color: white; border: 4px solid;
             box-shadow: 0 0 10px rgba(0,0,0,0.4);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
             position: relative;
         }
-        .avatar-pin img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .avatar-pin img { width: 100%; height: 100%; object-fit: cover; }
         .avatar-pin::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 10px 10px 0;
-            border-style: solid;
-            border-color: inherit;
-            border-left-color: transparent;
-            border-right-color: transparent;
-            border-bottom-color: transparent;
+            content: ''; position: absolute; bottom: -10px; left: 50%;
+            transform: translateX(-50%); border-width: 10px 10px 0;
+            border-style: solid; border-color: inherit;
+            border-left-color: transparent; border-right-color: transparent;
         }
     </style>
 </head>
 <body>
 
     <div class="top-navbar d-flex justify-content-between align-items-center">
-        <div>
-            <h4 class="m-0 text-dark fw-bold"><i class="fas fa-map-pin text-danger me-2"></i>{{ request.user.lar.nome|default:"Monitorização Campus" }}</h4>
+        <div class="d-flex align-items-center">
+            <button class="btn btn-outline-primary me-3 rounded-circle" onclick="toggleSidebar()" title="Mostrar/Esconder Lista">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h4 class="m-0 text-dark fw-bold"><i class="fas fa-map-pin text-danger me-2"></i>{{ request.user.lar.nome|default:"Monitorização Idosos" }}</h4>
         </div>
         <div>
             <button class="btn btn-light position-relative rounded-pill me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNotificacoes">
@@ -126,25 +133,31 @@
                 </span>
                 {% endif %}
             </button>
-
             <a href="{% url 'novovelhinho' %}" class="btn btn-success fw-bold px-4 rounded-pill shadow-sm"><i class="fas fa-plus me-2"></i>Adicionar Velhinho</a>
             <a href="/logout/" class="btn btn-outline-danger fw-bold rounded-pill ms-2 px-3">Sair</a>
         </div>
     </div>
 
     <div class="container-fluid px-4">
-        <div class="row">
+        <div class="row" id="main-row">
             
-            <div class="col-lg-8">
+            <div class="col-lg-2" id="sidebar-container">
+                <div class="utentes-sidebar">
+                    <div class="p-3 bg-light border-bottom fw-bold text-muted small"><i class="fas fa-users me-2"></i>UTENTES</div>
+                    <div class="list-group list-group-flush" id="lista-utentes-sidebar">
+                        </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6" id="map-container">
                 <div id="map"></div>
             </div>
 
             <div class="col-lg-4">
-                
                 <div class="side-card" id="painel-utente">
                     <img src="https://cdn-icons-png.flaticon.com/512/3532/3532649.png" id="sb-foto" class="profile-pic-large" alt="Utente">
                     <h4 class="mt-3 fw-bold" id="sb-nome">Selecione um Utente</h4>
-                    <h6 class="fw-bold text-muted" id="sb-status">Clique num pino no mapa</h6>
+                    <h6 class="fw-bold text-muted" id="sb-status">Clique num pino ou na lista</h6>
 
                     <div class="row mt-4">
                         <div class="col-6">
@@ -160,64 +173,44 @@
                             </div>
                         </div>
                     </div>
-
                     <a href="#" id="sb-btn-perfil" class="btn btn-outline-dark w-100 mt-4 fw-bold rounded-pill disabled">Ver Perfil Detalhado</a>
                 </div>
 
                 <div class="weather-card">
-                    <h6 class="fw-bold text-uppercase opacity-75 mb-3">Clima Atual - Braga</h6>
+                    <h6 class="fw-bold text-uppercase opacity-75 mb-3">Clima em <span id="clima-cidade">{{ clima.cidade_atual|default:"Braga" }}</span></h6>
                     <div class="d-flex justify-content-center align-items-center">
-                        <img src="{{ clima.icone_url }}" alt="Clima Ícone" width="80">
+                        <img src="{{ clima.icone_url }}" id="clima-icone" alt="Clima Ícone" width="80">
                         <div class="text-start ms-3">
-                            <h1 class="display-4 fw-bold mb-0">{{ clima.temp }}°C</h1>
-                            <h5 class="fw-bold text-uppercase m-0">{{ clima.desc }}</h5>
+                            <h1 class="display-4 fw-bold mb-0"><span id="clima-temp">{{ clima.temp }}</span>°C</h1>
+                            <h5 class="fw-bold text-uppercase m-0" id="clima-desc">{{ clima.desc }}</h5>
                         </div>
                     </div>
-                    
                     <div class="weather-info">
-                        <div>
-                            <span class="d-block opacity-75">Humidade</span>
-                            <b>{{ clima.humidade }}%</b>
-                        </div>
-                        <div>
-                            <span class="d-block opacity-75">Vento</span>
-                            <b>{{ clima.vento }} km/h</b>
-                        </div>
+                        <div><span class="d-block opacity-75">Humidade</span><b id="clima-humidade">{{ clima.humidade }}%</b></div>
+                        <div><span class="d-block opacity-75">Ar</span><b id="clima-ar">{{ clima.qualidade_ar|default:"Boa" }}</b></div>
+                        <div><span class="d-block opacity-75">Vento</span><b id="clima-vento">{{ clima.vento }} km/h</b></div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
 
     <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasNotificacoes" style="border-radius: 20px 0 0 20px;">
         <div class="offcanvas-header bg-light">
-            <h5 class="offcanvas-title fw-bold"><i class="fas fa-stream me-2"></i>Alertas do Sistema</h5>
+            <h5 class="offcanvas-title fw-bold">Alertas do Sistema</h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
             {% if not notificacoes %}
-                <div class="text-center py-5">
-                    <i class="fas fa-check-circle text-success mb-3" style="font-size: 3rem; opacity: 0.3;"></i>
-                    <p class="text-muted">Tudo em ordem. Não há alertas pendentes.</p>
-                </div>
+                <div class="text-center py-5"><i class="fas fa-check-circle text-success mb-3 fs-1" style="opacity:0.3"></i><p>Tudo em ordem.</p></div>
             {% else %}
                 {% for n in notificacoes %}
-                <div class="alert alert-{{ n.nivel }} d-flex align-items-center shadow-sm mb-3" role="alert">
+                <div class="alert alert-{{ n.nivel }} d-flex align-items-center shadow-sm mb-3">
                     <i class="fas {{ n.icon }} fs-4 me-3"></i>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">{{ n.titulo }}</h6>
-                        <p class="mb-0 small">{{ n.msg }}</p>
-                    </div>
+                    <div><h6 class="alert-heading fw-bold mb-1">{{ n.titulo }}</h6><p class="mb-0 small">{{ n.msg }}</p></div>
                 </div>
                 {% endfor %}
             {% endif %}
-            
-            <hr>
-            <div class="card bg-primary text-white border-0 rounded-4 p-3 mt-4">
-                <h6 class="fw-bold mb-2"><i class="fas fa-lightbulb me-2"></i>Dica do Dia</h6>
-                <p class="small mb-0">Monitorize a atividade com frequência. Temperaturas muito baixas e ventos fortes agravam os riscos ao ar livre.</p>
-            </div>
         </div>
     </div>
 
@@ -228,44 +221,52 @@
         var larLat = {{ request.user.lar.center_lat|default:41.5607|stringformat:".4f" }};
         var larLng = {{ request.user.lar.center_lng|default:-8.3972|stringformat:".4f" }};
         var raioSeguranca = {{ request.user.lar.radius|default:500 }};
-
         var map = L.map('map').setView([larLat, larLng], 15);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        L.circle([larLat, larLng], {
-            color: '#3388ff',
-            fillColor: '#3388ff',
-            fillOpacity: 0.15,
-            radius: raioSeguranca
-        }).addTo(map);
-
-        L.marker([larLat, larLng]).addTo(map).bindPopup("<b>{{ request.user.lar.nome|default:'Sede do Lar' }}</b>");
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.circle([larLat, larLng], { color: '#3388ff', fillOpacity: 0.15, radius: raioSeguranca }).addTo(map);
+        L.marker([larLat, larLng]).addTo(map).bindPopup("<b>{{ request.user.lar.nome|default:'Sede' }}</b>");
 
         var markers = {};
+
+        // FUNÇÃO PARA OCULTAR/MOSTRAR SIDEBAR
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar-container');
+            var mapContainer = document.getElementById('map-container');
+            
+            if (sidebar.classList.contains('sidebar-hidden')) {
+                sidebar.classList.remove('sidebar-hidden');
+                mapContainer.classList.replace('col-lg-8', 'col-lg-6');
+            } else {
+                sidebar.classList.add('sidebar-hidden');
+                mapContainer.classList.replace('col-lg-6', 'col-lg-8');
+            }
+            // Atualiza o tamanho do mapa após a transição
+            setTimeout(function() { map.invalidateSize(); }, 300);
+        }
+
+        function focarNoUtente(id) {
+            if(markers[id]) {
+                markers[id].fire('click');
+                map.flyTo(markers[id].getLatLng(), 17);
+            }
+        }
 
         function atualizarMapa() {
             fetch('/api/localizacoes/')
             .then(res => res.json())
             .then(data => {
-                data.forEach(i => {
-                    if (markers[i.id]) {
-                        map.removeLayer(markers[i.id]);
-                    }
+                const sidebar = document.getElementById('lista-utentes-sidebar');
+                let listaHTML = "";
 
-                    var corBorda = i.dentro ? "#28a745" : "#dc3545";
-                    
+                data.forEach(i => {
+                    if (markers[i.id]) { map.removeLayer(markers[i.id]); }
+
+                    var cor = i.dentro ? "#28a745" : "#dc3545";
                     var avatarIcon = L.divIcon({
                         className: 'custom-avatar-icon',
-                        html: `
-                            <div class="avatar-pin" style="border-color: ${corBorda}; color: ${corBorda};">
-                                <img src="https://cdn-icons-png.flaticon.com/512/3532/3532649.png" alt="Utente">
-                            </div>
-                        `,
-                        iconSize: [50, 60],
-                        iconAnchor: [25, 60] 
+                        html: `<div class="avatar-pin" style="border-color: ${cor}; color: ${cor};"><img src="https://cdn-icons-png.flaticon.com/512/3532/3532649.png"></div>`,
+                        iconSize: [50, 60], iconAnchor: [25, 60]
                     });
 
                     var marker = L.marker([i.lat, i.lng], {icon: avatarIcon}).addTo(map);
@@ -275,27 +276,41 @@
                         document.getElementById('sb-passos').innerHTML = `<i class="fas fa-shoe-prints text-primary me-2"></i>${i.passos}`;
                         document.getElementById('sb-dist').innerHTML = `<i class="fas fa-ruler text-primary me-2"></i>${i.distancia}m`;
                         
+                        if (i.clima) {
+                            document.getElementById('clima-cidade').innerText = i.clima.cidade;
+                            document.getElementById('clima-temp').innerText = i.clima.temp;
+                            document.getElementById('clima-desc').innerText = i.clima.desc;
+                            document.getElementById('clima-icone').src = i.clima.icone_url;
+                            document.getElementById('clima-humidade').innerText = i.clima.humidade + "%";
+                            document.getElementById('clima-vento').innerText = i.clima.vento + " km/h";
+                        }
+
                         var statusEl = document.getElementById('sb-status');
                         var fotoEl = document.getElementById('sb-foto');
-                        
                         if(i.dentro) {
-                            statusEl.innerHTML = '<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>EM SEGURANÇA</span>';
+                            statusEl.innerHTML = '<span class="text-success fw-bold">EM SEGURANÇA</span>';
                             fotoEl.style.borderColor = "#28a745";
                         } else {
-                            statusEl.innerHTML = '<span class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i>FORA DE ZONA</span>';
+                            statusEl.innerHTML = '<span class="text-danger fw-bold">FORA DE ZONA</span>';
                             fotoEl.style.borderColor = "#dc3545";
                         }
 
                         var btnPerfil = document.getElementById('sb-btn-perfil');
                         btnPerfil.href = `/perfil/${i.id}/`;
-                        btnPerfil.classList.remove('disabled');
-                        btnPerfil.classList.replace('btn-outline-dark', 'btn-primary');
+                        btnPerfil.classList.remove('disabled', 'btn-outline-dark');
+                        btnPerfil.classList.add('btn-primary');
                     });
 
                     markers[i.id] = marker;
+
+                    listaHTML += `
+                        <div class="list-group-item utente-item p-3 d-flex align-items-center" onclick="focarNoUtente(${i.id})">
+                            <span class="status-dot ${i.dentro ? 'bg-success' : 'bg-danger'} me-2"></span>
+                            <div class="fw-bold small text-dark">${i.nome}</div>
+                        </div>`;
                 });
-            })
-            .catch(err => console.error("Erro na API:", err));
+                sidebar.innerHTML = listaHTML;
+            });
         }
 
         atualizarMapa();
