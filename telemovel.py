@@ -5,7 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # --- 1. CONFIGURAÇÕES E FIREBASE ---
-cred_path = r"C:\Users\saraa\Documents\1ano mestrado\2semestre\ambientes inteligente\keys_trab1\aims-tp1-firebase-adminsdk-fbsvc-7898f84f90.json"
+cred_path ="" 
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_path)
@@ -14,14 +14,13 @@ if not firebase_admin._apps:
     })
 
 #chaves
-ID = "1"
 
 def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "refresh_token": REFRESH_TOKEN,
+        "client_id": "CLIENT_ID",
+        "client_secret": "CLIENT_SECRET",
+        "refresh_token": "REFRESH_TOKEN",
         "grant_type": "refresh_token"
     }
     res = requests.post(token_url, data=token_data).json()
@@ -58,10 +57,10 @@ def obter_historico_7_dias(access_token):
             
             data_str = inicio_dia.strftime('%Y-%m-%d')
             historico.append({'data': data_str, 'passos': passos_do_dia})
-            print(f"{data_str}: {passos_do_dia} passos (Recuperados)")
+            print(f"📊 {data_str}: {passos_do_dia} passos (Recuperados)")
             
         except Exception as e:
-            print(f"Erro no dia {i}: {e}")
+            print(f"⚠️ Erro no dia {i}: {e}")
             
     return historico
 
@@ -90,20 +89,20 @@ def obter_passos_atuais(access_token):
         
         return total_passos
     except Exception as e:
-        print(f"Erro ao ler passos reais: {e}")
+        print(f"⚠️ Erro ao ler passos reais: {e}")
         return 0
 
 def buscar_e_enviar():
-    print("A iniciar Sistema de Monitorização (Apenas Passos)...")
+    print("🚀 A iniciar Sistema de Monitorização (Apenas Passos)...")
     
     token = obter_access_token()
     if token:
-        print("A importar histórico semanal...")
+        print("📊 A importar histórico semanal...")
         hist = obter_historico_7_dias(token)
-        db.reference(f'monitorizacao/utilizador_0{ID}/estatisticas_semanais').set(hist)
+        db.reference('monitorizacao/utilizador_01/estatisticas_semanais').set(hist)
     
-    ref_hist = db.reference(f'monitorizacao/utilizador_0{ID}/historico')
-    ref_atual = db.reference(f'monitorizacao/utilizador_0{ID}/atual')
+    ref_hist = db.reference('monitorizacao/utilizador_01/historico')
+    ref_atual = db.reference('monitorizacao/utilizador_01/atual')
     
     while True:
         try:
@@ -122,12 +121,12 @@ def buscar_e_enviar():
             # Para o histórico, guardamos o registo dos passos
             ref_hist.push(dados)
             
-            print(f"Passos Sincronizados: {p}")
+            print(f"✅ Passos Sincronizados: {p}")
             
         except Exception as e:
-            print(f"Erro no loop: {e}")
+            print(f"❌ Erro no loop: {e}")
             
-        time.sleep(60)
+        time.sleep(600)
 
 if __name__ == "__main__":
     buscar_e_enviar()

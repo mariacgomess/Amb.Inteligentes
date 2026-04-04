@@ -136,27 +136,20 @@
         <div class="profile-header mx-3 mt-3">
             <img src="https://cdn-icons-png.flaticon.com/512/3532/3532649.png" alt="Utente" class="profile-avatar">
             <div class="profile-name-header">
-                <h2 class="fw-bold mb-0 text-dark">{{ idoso.nome }}</h2>
-                <span class="badge bg-secondary fs-6"><i class="fas fa-home me-1"></i> {{ idoso.lar.nome }}</span>
-                
-                {% if dados.dentro %}
-                    <span class="badge bg-success fs-6 ms-2"><i class="fas fa-shield-alt me-1"></i> Seguro</span>
-                {% else %}
-                    <span class="badge bg-danger fs-6 ms-2"><i class="fas fa-exclamation-triangle me-1"></i> Fora de Zona</span>
-                {% endif %}
+    <h2 class="fw-bold mb-0 text-dark">{{ idoso.nome }}</h2>
+    <span class="badge bg-secondary fs-6"><i class="fas fa-home me-1"></i> {{ idoso.lar.nome }}</span>
+    
+    {% if dados.dentro %}
+        <span class="badge bg-success fs-6 ms-2"><i class="fas fa-shield-alt me-1"></i> Seguro</span>
+    {% else %}
+        <span class="badge bg-danger fs-6 ms-2"><i class="fas fa-exclamation-triangle me-1"></i> Fora de Zona</span>
+    {% endif %}
 
-                {% if dados.status_ativo == "Ativo" %}
-                    <span class="badge bg-primary fs-6 ms-2 shadow-sm"><i class="fas fa-walking me-1"></i> Em Movimento</span>
-                {% else %}
-                    <span class="badge bg-secondary fs-6 ms-2 shadow-sm"><i class="fas fa-bed me-1"></i> Em Repouso</span>
-                {% endif %}
-
-                {% if dados.intensidade %}
-                    <span class="badge rounded-pill bg-info text-dark fs-6 ms-2 shadow-sm">
-                        <i class="fas fa-bolt me-1"></i> {{ dados.intensidade }}
-                    </span>
-                {% endif %}
-            </div>
+    <span class="badge rounded-pill {% if dados.status_ativo == 'Ativo' %}bg-primary{% else %}bg-info text-dark{% endif %} fs-6 ms-2 shadow-sm">
+        <i class="fas {% if dados.status_ativo == 'Ativo' %}fa-walking{% else %}fa-bed{% endif %} me-1"></i> 
+        {{ dados.intensidade|default:"Em Repouso" }}
+    </span>
+</div>
         </div>
     </div>
 
