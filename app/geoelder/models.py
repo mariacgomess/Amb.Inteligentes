@@ -11,6 +11,7 @@ class Lar(models.Model):
     radius = models.IntegerField(default=500) # 500 metros por defeito
     def __str__(self):
         return self.nome
+    
 class Velhinho(models.Model):
     sexo_opcoes = [('F', 'Feminino'), ('M', 'Masculino')]
     
@@ -23,7 +24,6 @@ class Velhinho(models.Model):
     def __str__(self):
         return self.nome
     
-# Create your models here.
 
 class Localizacao(models.Model):
     velhinho= models.ForeignKey(Velhinho, on_delete=models.CASCADE)

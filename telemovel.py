@@ -4,7 +4,7 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, db
 
-# --- 1. CONFIGURAÇÕES E FIREBASE ---
+# --- CONFIGURAÇÕES E FIREBASE ---
 cred_path ="" 
 
 if not firebase_admin._apps:
@@ -13,7 +13,8 @@ if not firebase_admin._apps:
         'databaseURL': 'https://aims-tp1-default-rtdb.europe-west1.firebasedatabase.app/'
     })
 
-#chaves
+
+# --- chaves ----
 
 def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
@@ -29,17 +30,15 @@ def obter_access_token():
 def obter_historico_7_dias(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    # Usamos a fonte "estimated_steps" que é a que a App Google Fit usa para o gráfico
+    # fonte "estimated_steps" que é a que a App Google Fit usa para o gráfico
     ds_estimado = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
     
     historico = []
     
-    # Em vez de um aggregate de 7 dias de uma vez, vamos pedir dia a dia
-    # para garantir que os limites de tempo (meia-noite) estão corretos
     for i in range(6, -1, -1):  # De 6 dias atrás até hoje (0)
         data_alvo = datetime.datetime.now() - datetime.timedelta(days=i)
         
-        # Definir início e fim do dia (meia-noite às 23:59:59)
+        # Define início e fim do dia (meia-noite às 23:59:59)
         inicio_dia = data_alvo.replace(hour=0, minute=0, second=0, microsecond=0)
         fim_dia = data_alvo.replace(hour=23, minute=59, second=59, microsecond=999)
         
@@ -57,22 +56,21 @@ def obter_historico_7_dias(access_token):
             
             data_str = inicio_dia.strftime('%Y-%m-%d')
             historico.append({'data': data_str, 'passos': passos_do_dia})
-            print(f"📊 {data_str}: {passos_do_dia} passos (Recuperados)")
+            print(f" {data_str}: {passos_do_dia} passos (Recuperados)")
             
         except Exception as e:
-            print(f"⚠️ Erro no dia {i}: {e}")
+            print(f" Erro no dia {i}: {e}")
             
     return historico
 
 def obter_passos_atuais(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    # Esta é a fonte de "Passos Estimados" que junta sensores e correções da App
-    # É a que mais se aproxima do valor real do ecrã
+    # fonte de "Passos Estimados" que junta sensores e correções da App
     ds_estimado = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
     
     agora_ns = int(time.time() * 1000000000)
-    # Vamos buscar desde o início do dia de hoje (meia-noite) até agora
+    # Vai buscar dados desde o início do dia de hoje (meia-noite) até agora
     inicio_dia = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     inicio_ns = int(inicio_dia.timestamp() * 1000000000)
     
@@ -82,22 +80,22 @@ def obter_passos_atuais(access_token):
         res = requests.get(url, headers=headers).json()
         total_passos = 0
         
-        # Somamos todos os pontos de passos registados hoje nesta fonte
+        # Soma de todos os pontos de passos registados hoje nesta fonte
         if "point" in res:
             for ponto in res["point"]:
                 total_passos += ponto["value"][0]["intVal"]
         
         return total_passos
     except Exception as e:
-        print(f"⚠️ Erro ao ler passos reais: {e}")
+        print(f" Erro ao ler passos reais: {e}")
         return 0
 
 def buscar_e_enviar():
-    print("🚀 A iniciar Sistema de Monitorização (Apenas Passos)...")
+    print(" A iniciar Sistema de Monitorização (Apenas Passos)...")
     
     token = obter_access_token()
     if token:
-        print("📊 A importar histórico semanal...")
+        print(" A importar histórico semanal...")
         hist = obter_historico_7_dias(token)
         db.reference('monitorizacao/utilizador_01/estatisticas_semanais').set(hist)
     
@@ -109,8 +107,7 @@ def buscar_e_enviar():
             token = obter_access_token() 
             p = obter_passos_atuais(token)
             
-            # Usamos update em vez de set para não apagar a latitude/longitude 
-            # que o telemóvel está a enviar em paralelo
+            # update em vez de set para não apagar a latitude/longitude que o telemóvel está a enviar em paralelo
             dados = {
                 'passos': p,
                 'timestamp': time.time(),
@@ -118,13 +115,13 @@ def buscar_e_enviar():
             }
             
             ref_atual.update(dados)
-            # Para o histórico, guardamos o registo dos passos
+            # Para o histórico, guarda o registo dos passos
             ref_hist.push(dados)
             
-            print(f"✅ Passos Sincronizados: {p}")
+            print(f" Passos Sincronizados: {p}")
             
         except Exception as e:
-            print(f"❌ Erro no loop: {e}")
+            print(f" Erro no loop: {e}")
             
         time.sleep(600)
 

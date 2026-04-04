@@ -315,11 +315,11 @@
     </div>
 
     <script>
-        // 1. Dados Iniciais
+        // Dados Iniciais
         const passosHoje = parseInt("{{ dados.passos|default:'0' }}");
         const metaPassos = parseInt("{{ idoso.daily_step_goal|default:'2000' }}");
         
-        // 2. Cálculos Automáticos Fixes!
+        // Cálculos Automáticos 
         const kmPercorridos = (passosHoje * 0.000762).toFixed(2);
         const caloriasQueimadas = Math.round(passosHoje * 0.04);
         
@@ -363,7 +363,7 @@
         });
 
         // ==========================================
-        // GRÁFICO 2: LINHAS (Semanal - CORRIGIDO!)
+        // GRÁFICO 2: LINHAS (Semanal)
         // ==========================================
         const ctxHistorico = document.getElementById('historicoChart').getContext('2d');
         
@@ -371,7 +371,7 @@
         gradient.addColorStop(0, 'rgba(13, 110, 253, 0.4)'); 
         gradient.addColorStop(1, 'rgba(13, 110, 253, 0.0)'); 
 
-        // 1. Lógica dos dias dinâmicos (O Último é Hoje)
+        // Lógica dos dias dinâmicos (O Último é Hoje)
         const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
         const labelsDinamicas = [];
         for (let i = 6; i >= 0; i--) {

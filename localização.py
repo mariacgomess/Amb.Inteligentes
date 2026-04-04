@@ -5,12 +5,11 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # ==========================================
-# 1. CONFIGURAÇÕES
+# CONFIGURAÇÕES
 # ==========================================
 TELEGRAM_TOKEN = "8304489726:AAFUvZpBJ5fJjMvJC07jC3bLbpfDKGqJWTA" 
 TELEGRAM_CHAT_ID = "-5142514106" 
 
-# Precisas de uma API Key gratuita em https://openweathermap.org/
 WEATHER_API_KEY = "4fa221e40fa0935eb478acfd7ea2c6f4" 
 
 NOMES_UTENTES = {
@@ -29,7 +28,7 @@ FENCE_CENTER = [41.5607, -8.3972]
 RADIUS_METERS = 500
 
 # ==========================================
-# 2. FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES
 # ==========================================
 
 def enviar_alerta_telegram(mensagem):
@@ -55,7 +54,7 @@ def obter_clima_perigoso():
         return False, "Erro API Clima"
 
 # ==========================================
-# 4. MOTOR DE DECISÃO DINÂMICO
+# MOTOR DE DECISÃO DINÂMICO
 # ==========================================
 def processar_dados():
     estados_anteriores = {} 
@@ -65,7 +64,7 @@ def processar_dados():
 
     while True:
         try:
-            # 1. Verificar clima global do lar (Braga)
+            # Verifica clima global do lar (Braga)
             chuva_detetada, descricao_clima = obter_clima_perigoso()
             
             monitorizacao = db.reference('monitorizacao').get()
@@ -110,7 +109,7 @@ def processar_dados():
 
                     # --- LÓGICA DE ALERTAS TELEGRAM ---
 
-                    # A. Alerta de Saída/Entrada de Zona
+                    # Alerta de Saída/Entrada de Zona
                     if not dentro and not estava_fora:
                         map_url = f"https://www.google.com/maps?q={lat},{lon}"
                         msg = (f"🚨 <b>ALERTA: Saída de Zona</b> 🚨\n\n"
@@ -125,7 +124,7 @@ def processar_dados():
                         enviar_alerta_telegram(msg)
                         estados_anteriores[user_id] = False
 
-                    # B. Alerta Combinado: Fora de Zona + Chuva
+                    # Alerta Combinado: Fora de Zona + Chuva
                     if not dentro and chuva_detetada:
                         agora = time.time()
                         ultima_vez = ultimo_alerta_clima.get(user_id, 0)
@@ -148,14 +147,14 @@ def processar_dados():
                         'status_ativo': status_ativo,
                         'intensidade': intensidade,
                         'minutos_inativo': minutos_inativo,
-                        'chuva_no_local': chuva_detetada, # Útil para mostrar um ícone no site
+                        'chuva_no_local': chuva_detetada, 
                         'timestamp': time.time()
                     })
 
         except Exception as e:
             print(f"Erro geral no loop: {e}")
 
-        time.sleep(10) # Aumentado para 10s para poupar pedidos à API
+        time.sleep(10) #  10s para poupar pedidos à API
 
 if __name__ == "__main__":
     processar_dados()
