@@ -5,7 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # --- CONFIGURAÇÕES E FIREBASE ---
-cred_path ="" 
+cred_path = r"C:\Users\saraa\Documents\1ano mestrado\2semestre\ambientes inteligente\keys_trab1\aims-tp1-firebase-adminsdk-fbsvc-7898f84f90.json"
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_path)
@@ -16,12 +16,14 @@ if not firebase_admin._apps:
 
 # --- chaves ----
 
+ID = "2"
+
 def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-        "client_id": "CLIENT_ID",
-        "client_secret": "CLIENT_SECRET",
-        "refresh_token": "REFRESH_TOKEN",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "refresh_token": REFRESH_TOKEN,
         "grant_type": "refresh_token"
     }
     res = requests.post(token_url, data=token_data).json()
@@ -97,10 +99,10 @@ def buscar_e_enviar():
     if token:
         print(" A importar histórico semanal...")
         hist = obter_historico_7_dias(token)
-        db.reference('monitorizacao/utilizador_01/estatisticas_semanais').set(hist)
+        db.reference(f'monitorizacao/utilizador_0{ID}/estatisticas_semanais').set(hist)
     
-    ref_hist = db.reference('monitorizacao/utilizador_01/historico')
-    ref_atual = db.reference('monitorizacao/utilizador_01/atual')
+    ref_hist = db.reference(f'monitorizacao/utilizador_0{ID}/historico')
+    ref_atual = db.reference(f'monitorizacao/utilizador_0{ID}/atual')
     
     while True:
         try:
