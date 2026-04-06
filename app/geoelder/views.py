@@ -5,11 +5,9 @@ from .models import Velhinho
 from .forms import VelhinhoForm
 from .firebase_service import get_dados_idoso
 from django.contrib.auth.decorators import login_required
-from geopy.distance import geodesic 
 import requests
 from firebase_admin import db
-from datetime import datetime
-from datetime import date
+from datetime import date, datetime
 from django.contrib import messages 
 from django.shortcuts import get_object_or_404
 import json
@@ -70,26 +68,39 @@ def get_localizacoes(request):
 
 def consultar_clima_dinamico(lat, lon):
     api_key = "4fa221e40fa0935eb478acfd7ea2c6f4"
-    url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=pt"
+    
+    # URL para o Tempo (Weather)
+    url_tempo = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=pt"
+    
+    # URL para a Poluição (Air Pollution)
+    url_poluicao = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={api_key}"
     
     try:
-        response = requests.get(url, timeout=3)
-        x = response.json()
+        # Chamada para o tempo
+        res_t = requests.get(url_tempo, timeout=3).json()
+        # Chamada para a poluição
+        res_p = requests.get(url_poluicao, timeout=3).json()
 
-        if x["cod"] == 200:
-            desc = x["weather"][0]["description"].lower() # Vai buscar a descrição
+        if res_t["cod"] == 200:
+            desc = res_t["weather"][0]["description"].lower()
+            
+            # Lógica para converter o índice AQI (1 a 5) em texto
+            aqi = res_p['list'][0]['main']['aqi']
+            aqi_labels = {1: "Excelente", 2: "Boa", 3: "Moderada", 4: "Pobre", 5: "Muito Pobre"}
+            
             return {
-                "temp": round(x["main"]["temp"]),
-                "feels_like": round(x["main"]["feels_like"]),
-                "humidade": x["main"]["humidity"],
-                "vento": round(x["wind"]["speed"] * 3.6),
+                "temp": round(res_t["main"]["temp"]),
+                "feels_like": round(res_t["main"]["feels_like"]),
+                "humidade": res_t["main"]["humidity"],
+                "vento": round(res_t["wind"]["speed"] * 3.6),
                 "desc": desc,
-                "icone_url": f"http://openweathermap.org/img/wn/{x['weather'][0]['icon']}@2x.png",
-                "cidade_atual": x.get("name", "Localização Remota"),
-                "chuva": any(p in desc for p in ["chuva", "rain", "chuvisco", "drizzle", "trovoada"])
+                "icone_url": f"http://openweathermap.org/img/wn/{res_t['weather'][0]['icon']}@2x.png",
+                "cidade_atual": res_t.get("name", "Localização Remota"),
+                "chuva": any(p in desc for p in ["chuva", "rain", "chuvisco", "drizzle", "trovoada"]),
+                "qualidade_ar": aqi_labels.get(aqi, "N/A")
             }
     except Exception as e:
-        print(f"Erro no clima: {e}")
+        print(f"Erro no clima/poluição: {e}")
     return None
 
 def mapa(request):
@@ -122,8 +133,6 @@ def mapa(request):
         
         if dados:
             passos = dados.get('passos', 0)
-            lat = dados.get('latitude')
-            lng = dados.get('longitude')
             
             # Usa os dados do lar do próprio idoso
             centro_lat = i.lar.center_lat if i.lar else 41.5607
@@ -229,7 +238,7 @@ def perfil(request, id):
     
     # Injetar dados vivos no objeto que vai para o HTML
     ref_tratado['hora_leitura'] = ref_atual.get('hora_leitura', "---")
-    ref_tratado['status_ativo'] = ref_atual.get('status', "Inativo") # Novo campo real!
+    ref_tratado['status_ativo'] = ref_atual.get('status_ativo', "Inativo") 
 
     # Dados Históricos (Estatísticas)
     ref_semanal = db.reference(f'monitorizacao/utilizador_0{idoso.id}/estatisticas_semanais').get()
@@ -238,7 +247,6 @@ def perfil(request, id):
     total_passos_semana = 0
     dias_com_dados = 0
     
-    from datetime import date, datetime
     hoje = date.today()
     
     if ref_semanal:

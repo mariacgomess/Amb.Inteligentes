@@ -15,8 +15,10 @@ if not firebase_admin._apps:
 
 
 # --- chaves ----
-
-ID = "2"
+CLIENT_ID = ""
+CLIENT_SECRET = ""
+REFRESH_TOKEN = ""
+ID = ""
 
 def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
