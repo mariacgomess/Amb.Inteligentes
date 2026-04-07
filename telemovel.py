@@ -5,7 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # --- CONFIGURAÇÕES E FIREBASE ---
-cred_path ="" 
+cred_path =r"C:\Users\helen\Desktop\Mestrado\2Semestre\Ambientes Inteligentes\TPg\aims-tp1-firebase-adminsdk-fbsvc-7898f84f90.json"
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_path)
@@ -19,9 +19,9 @@ if not firebase_admin._apps:
 def obter_access_token():
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-        "client_id": "CLIENT_ID",
-        "client_secret": "CLIENT_SECRET",
-        "refresh_token": "REFRESH_TOKEN",
+        "client_id": "",
+        "client_secret": "",
+        "refresh_token": "",
         "grant_type": "refresh_token"
     }
     res = requests.post(token_url, data=token_data).json()

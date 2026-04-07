@@ -299,6 +299,16 @@
                         btnPerfil.href = `/perfil/${i.id}/`;
                         btnPerfil.classList.remove('disabled', 'btn-outline-dark');
                         btnPerfil.classList.add('btn-primary');
+
+                        var arEl = document.getElementById('clima-ar');
+                        
+                        arEl.innerText = i.clima.qualidade_ar;
+                        // Muda a cor se for perigoso
+                        if (i.clima.qualidade_ar === "Pobre" || i.clima.qualidade_ar === "Muito Pobre") {
+                            arEl.style.color = "#ff4444"; // Vermelho
+                        } else {
+                            arEl.style.color = "white";
+                        }
                     });
 
                     markers[i.id] = marker;
